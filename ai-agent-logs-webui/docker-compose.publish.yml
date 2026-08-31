@@ -1,0 +1,8 @@
+# Optional overlay: host port publish (local / explicit publish_port).
+
+services:
+  ai-agent-log-webui:
+    ports:
+      - target: 80
+        published: ${PUBLISH_PORT:-5185}
+        protocol: tcp

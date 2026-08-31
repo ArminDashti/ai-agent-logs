@@ -1,0 +1,16 @@
+name: ai-agent-logs
+
+services:
+  ai-agent-log-webui:
+    image: ${IMAGE_TAG:-ai-agent-log-webui:latest}
+    container_name: ai-agent-logs
+    expose:
+      - "${INTERNAL_PORT:-80}"
+    networks:
+      - t3-net
+    restart: "no"
+
+networks:
+  t3-net:
+    name: ${DOCKER_NETWORK:-t3-net}
+    external: true

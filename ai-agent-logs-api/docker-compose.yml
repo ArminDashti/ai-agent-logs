@@ -1,0 +1,49 @@
+name: ai-agent-logs
+
+services:
+  ai-agent-log-pgsql:
+    image: postgres:16-alpine
+    container_name: ai-agent-log-pgsql
+    environment:
+      POSTGRES_USER: ai_agent
+      POSTGRES_PASSWORD: ai_agent
+      POSTGRES_DB: ai_agent
+    volumes:
+      - ai-agent-log-pgsql-vol:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    networks:
+      - t3-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_agent -d ai_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: "no"
+
+  ai-agent-log-api:
+    image: ${IMAGE_TAG:-ai-agent-log-api:latest}
+    container_name: ai-agent-logs
+    expose:
+      - "${INTERNAL_PORT:-8120}"
+    environment:
+      ADDR: ":${INTERNAL_PORT:-8120}"
+      JWT_SECRET: ${JWT_SECRET:-ai-agent-log-jwt-change-in-prod-7f3a9c}
+      DATABASE_URL: postgres://ai_agent:ai_agent@ai-agent-log-pgsql:5432/ai_agent?sslmode=disable
+      MIGRATIONS_DIR: /app/migrations
+      GIN_MODE: release
+    networks:
+      - t3-net
+    depends_on:
+      ai-agent-log-pgsql:
+        condition: service_healthy
+    restart: "no"
+
+networks:
+  t3-net:
+    name: ${DOCKER_NETWORK:-t3-net}
+    external: true
+
+volumes:
+  ai-agent-log-pgsql-vol:
+    name: ai-agent-log-pgsql-vol

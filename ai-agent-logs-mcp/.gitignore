@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+*.exe
+
+# github-commit-push-all: large files (>5MB) — auto-managed
+
+
+# Auto-managed large files (>5MB)
+node_modules/@esbuild/win32-x64/esbuild.exe
+node_modules/typescript/lib/_tsc.js
+node_modules/typescript/lib/typescript.js

@@ -1,0 +1,28 @@
+# Grid layout update — webui on T3
+
+Date: 2026-08-28 14:40 (UTC+3:30)
+
+## Changes
+- Full-width grids on Sessions and Prompts pages (removed max-width header blocks)
+- Removed page h1/p titles from Sessions and Prompts
+- Sort grids by `created_at` descending (newest first)
+- Prompts: merged Date+Time into single `Created at` column (24h via formatDateTime)
+- Sessions: replaced Start/End DateTime with `Created at` at end; added `App` column
+- Client-side pagination: 100 items per page (GridPagination component)
+
+## Deploy
+- Built `ai-agent-log-webui:latest` locally
+- Transferred image via `docker save | ssh docker load`
+- Recreated container at `/cloud-admin/docker-volumes/ai-agent-log-webui`
+
+## Commands
+```bash
+docker build -f dockerfile -t ai-agent-log-webui:latest .
+docker save ai-agent-log-webui:latest | ssh t3 docker load
+ssh t3 "cd /cloud-admin/docker-volumes/ai-agent-log-webui && docker compose -p ai-agent-log-webui up -d --force-recreate"
+```
+
+## Result
+- Container `ai-agent-log-webui` Up with new image
+- HTTPS check `ai-agent-log.xaigrok.ir`: 200
+- New bundle: `index-Db9rDT4V.js`

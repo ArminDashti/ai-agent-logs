@@ -1,0 +1,25 @@
+# Update webui container on Irancell-T3
+
+Date: 2026-08-28 15:02 (UTC+3:30)
+
+## Changes deployed
+- Removed separate Prompts page (prompts only in Sessions detail)
+- Session grid columns: App, Project, Title, Prompt, Rate, Duration, Tokens, Device, Created at
+- Prompt detail grid columns: Mode, Prompt, Response, Rate, Duration, Tokens, IP, Created at
+
+## Connection
+- SSH MCP (port 80): ECONNREFUSED
+- SSH port 22: success (`cloud-admin@2.144.27.124`)
+
+## Commands
+```bash
+docker build -f dockerfile -t ai-agent-log-webui:latest .
+docker save ai-agent-log-webui:latest | ssh -p 22 -i ~/.ssh/id_ed25519_cloud-admin_2-144-27-124 -o IdentitiesOnly=yes cloud-admin@2.144.27.124 docker load
+ssh -p 22 -i ~/.ssh/id_ed25519_cloud-admin_2-144-27-124 -o IdentitiesOnly=yes cloud-admin@2.144.27.124 \
+  "cd /cloud-admin/docker-volumes/ai-agent-log-webui && docker compose -p ai-agent-log-webui up -d --force-recreate"
+```
+
+## Result
+- Container `ai-agent-log-webui` Up with `ai-agent-log-webui:latest`
+- HTTPS check `ai-agent-log.xaigrok.ir`: 200
+- New bundle: `index-D81Cw1uY.js`

@@ -1,0 +1,26 @@
+﻿# Publish ai-agent-log on T3
+
+Date: 2026-08-24 18:33:00
+
+## Stacks
+- ai-agent-log-api @ /cloud-admin/docker-volumes/ai-agent-log-api (image ai-agent-log-api:latest, port 8120)
+- ai-agent-log-webui @ /cloud-admin/docker-volumes/ai-agent-log-webui (image ai-agent-log-webui:latest, port 80)
+- Network: t3-net (HAProxy)
+
+## Hostnames
+- ai-agent-log.xaigrok.ir -> ai-agent-log-webui:80
+- ai-agent-log-api.xaigrok.ir -> ai-agent-log-api:8120
+
+## Checks
+- Container health: ok (API /health, WebUI 200)
+- HAProxy Host/SNI routes: added; HUP ok
+- curl --resolve both hostnames: 200
+- SoftEther ovpbackup.xaigrok.ir: still responding
+- Renew hook: domains added to haproxy-pem.sh
+
+## Blocked
+- DNS A records missing for both hostnames (not 2.144.27.124)
+- Let's Encrypt not issued (needs DNS + temporary free of :80 from sshd)
+
+## Result
+Partial: stacks + HAProxy live; TLS pending DNS + Certbot approval
