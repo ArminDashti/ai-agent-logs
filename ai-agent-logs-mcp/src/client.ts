@@ -35,7 +35,8 @@ export type SessionPromptRow = {
   model: string
   project: string
   user_ip: string
-  token_usage: string
+  input_token: number
+  output_token: number
   refined_prompt: string
   is_accepted: boolean
   date: string
@@ -66,19 +67,20 @@ export type LogAgentResponseInput = {
   date: string
   time: string
   device: string
-  user_ip?: string
+  user_ip: string
   duration_ms: number
   project: string
-  app?: string
-  token_usage?: string
+  app: string
+  input_token: number
+  output_token: number
   user_prompt: string
-  refined_prompt?: string
+  refined_prompt: string
   is_accepted: boolean
   agent_response: string
-  session?: string
+  session: string
   title_of_session: string
-  mode?: string
-  agent?: string
+  mode: string
+  agent: string
 }
 
 export type AgentTurnLog = {

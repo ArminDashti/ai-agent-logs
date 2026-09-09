@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -23,7 +22,7 @@ const sessionSelectSQL = `
 			COALESCE(AVG(sp.rate), 0)::float8 AS rate,
 			s.device,
 			COALESCE(SUM(sp.duration_ms), 0)::int AS duration_ms,
-			COALESCE(SUM(parse_token_usage(sp.token_usage)), 0)::int AS token_total,
+			COALESCE(SUM(sp.input_token + sp.output_token), 0)::int AS token_total,
 			COALESCE(MIN(sp.created_at), s.created_at) AS started_at,
 			COALESCE(MAX(sp.created_at), s.created_at) AS ended_at,
 			s.created_at
@@ -91,7 +90,7 @@ func (h *Handler) GetSession(c *gin.Context) {
 		SELECT
 			id, session_id, prompt, mode, response, rate, duration_ms,
 			COALESCE(model, ''), COALESCE(project, ''), COALESCE(app, 'cursor'), COALESCE(user_ip, ''),
-			COALESCE(token_usage, ''), COALESCE(refined_prompt, ''), COALESCE(is_accepted, TRUE),
+			COALESCE(input_token, 0), COALESCE(output_token, 0), COALESCE(refined_prompt, ''), COALESCE(is_accepted, TRUE),
 			COALESCE(to_char(log_date, 'YYYY-MM-DD'), ''),
 			COALESCE(to_char(log_time, 'HH24:MI:SS'), ''),
 			created_at
@@ -111,7 +110,7 @@ func (h *Handler) GetSession(c *gin.Context) {
 		if err := promptRows.Scan(
 			&p.ID, &p.SessionID, &p.Prompt, &p.Mode, &p.Response,
 			&p.Rate, &p.DurationMs, &p.Model, &p.Project, &p.App, &p.UserIP,
-			&p.TokenUsage, &p.RefinedPrompt, &p.IsAccepted, &p.LogDate, &p.LogTime,
+			&p.InputToken, &p.OutputToken, &p.RefinedPrompt, &p.IsAccepted, &p.LogDate, &p.LogTime,
 			&p.CreatedAt,
 		); err != nil {
 			writeError(c, http.StatusInternalServerError, "could not read session prompts")
@@ -135,7 +134,7 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 			(SELECT COUNT(*)::int FROM sessions) AS session_count,
 			COALESCE((SELECT AVG(rate)::float8 FROM session_prompts), 0) AS avg_rate,
 			COALESCE((SELECT SUM(duration_ms)::int FROM session_prompts), 0) AS total_duration_ms,
-			COALESCE((SELECT SUM(parse_token_usage(token_usage))::int FROM session_prompts), 0) AS token_total
+			COALESCE((SELECT SUM(input_token + output_token)::int FROM session_prompts), 0) AS token_total
 	`).Scan(&stats.SessionCount, &stats.AvgRate, &stats.TotalDurationMs, &stats.TokenTotal)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "could not load dashboard stats")
@@ -145,24 +144,25 @@ func (h *Handler) DashboardStats(c *gin.Context) {
 }
 
 type logAgentResponseRequest struct {
-	Model          string `json:"model" binding:"required"`
-	Rate           *int   `json:"rate" binding:"required"`
-	Date           string `json:"date" binding:"required"`
-	Time           string `json:"time" binding:"required"`
-	Device         string `json:"device" binding:"required"`
-	UserIP         string `json:"user_ip"`
-	DurationMs     *int   `json:"duration_ms" binding:"required"`
-	Project        string `json:"project" binding:"required"`
-	App            string `json:"app"`
-	TokenUsage     string `json:"token_usage"`
-	UserPrompt     string `json:"user_prompt" binding:"required"`
-	RefinedPrompt  string `json:"refined_prompt"`
-	IsAccepted     *bool  `json:"is_accepted" binding:"required"`
-	AgentResponse  string `json:"agent_response" binding:"required"`
-	Session        string `json:"session"`
-	TitleOfSession string `json:"title_of_session" binding:"required"`
-	Mode           string `json:"mode"`
-	Agent          string `json:"agent"`
+	Model          string  `json:"model" binding:"required"`
+	Rate           *int    `json:"rate" binding:"required"`
+	Date           string  `json:"date" binding:"required"`
+	Time           string  `json:"time" binding:"required"`
+	Device         string  `json:"device" binding:"required"`
+	UserIP         string  `json:"user_ip" binding:"required"`
+	DurationMs     *int    `json:"duration_ms" binding:"required"`
+	Project        string  `json:"project" binding:"required"`
+	App            string  `json:"app" binding:"required"`
+	InputToken     *int    `json:"input_token" binding:"required"`
+	OutputToken    *int    `json:"output_token" binding:"required"`
+	UserPrompt     string  `json:"user_prompt" binding:"required"`
+	RefinedPrompt  *string `json:"refined_prompt" binding:"required"`
+	IsAccepted     *bool   `json:"is_accepted" binding:"required"`
+	AgentResponse  string  `json:"agent_response" binding:"required"`
+	Session        string  `json:"session" binding:"required"`
+	TitleOfSession string  `json:"title_of_session" binding:"required"`
+	Mode           string  `json:"mode" binding:"required"`
+	Agent          string  `json:"agent" binding:"required"`
 }
 
 // LogAgentResponse creates or reuses a session and stores one full agent turn.
@@ -181,8 +181,17 @@ func (h *Handler) LogAgentResponse(c *gin.Context) {
 	sessionTitle := strings.TrimSpace(req.TitleOfSession)
 	dateStr := strings.TrimSpace(req.Date)
 	timeStr := strings.TrimSpace(req.Time)
+	userIP := strings.TrimSpace(req.UserIP)
+	appName := strings.TrimSpace(req.App)
+	mode := strings.TrimSpace(req.Mode)
+	agentName := strings.TrimSpace(req.Agent)
+	sessionID := strings.TrimSpace(req.Session)
 	if model == "" || device == "" || project == "" || userPrompt == "" || agentResponse == "" || sessionTitle == "" {
 		writeError(c, http.StatusBadRequest, "model, device, project, user_prompt, agent_response, and title_of_session are required")
+		return
+	}
+	if userIP == "" || appName == "" || mode == "" || agentName == "" || sessionID == "" {
+		writeError(c, http.StatusBadRequest, "user_ip, app, mode, agent, and session are required")
 		return
 	}
 	if req.DurationMs == nil || *req.DurationMs < 0 {
@@ -197,6 +206,19 @@ func (h *Handler) LogAgentResponse(c *gin.Context) {
 		writeError(c, http.StatusBadRequest, "is_accepted is required")
 		return
 	}
+	if req.InputToken == nil || *req.InputToken < 0 {
+		writeError(c, http.StatusBadRequest, "input_token must be >= 0")
+		return
+	}
+	if req.OutputToken == nil || *req.OutputToken < 0 {
+		writeError(c, http.StatusBadRequest, "output_token must be >= 0")
+		return
+	}
+	if req.RefinedPrompt == nil {
+		writeError(c, http.StatusBadRequest, "refined_prompt is required")
+		return
+	}
+	refined := strings.TrimSpace(*req.RefinedPrompt)
 
 	logDate, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
@@ -209,25 +231,6 @@ func (h *Handler) LogAgentResponse(c *gin.Context) {
 		return
 	}
 
-	userIP := strings.TrimSpace(req.UserIP)
-	if userIP == "" {
-		userIP = clientIP(c)
-	}
-	tokenUsage := strings.TrimSpace(req.TokenUsage)
-	refined := strings.TrimSpace(req.RefinedPrompt)
-	mode := strings.TrimSpace(req.Mode)
-	if mode == "" {
-		mode = "agent"
-	}
-	agentName := strings.TrimSpace(req.Agent)
-	if agentName == "" {
-		agentName = "Cursor"
-	}
-	appName := strings.TrimSpace(req.App)
-	if appName == "" {
-		appName = "cursor"
-	}
-
 	tx, err := h.db.BeginTx(c.Request.Context(), nil)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "could not start transaction")
@@ -235,20 +238,24 @@ func (h *Handler) LogAgentResponse(c *gin.Context) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	sessionID := strings.TrimSpace(req.Session)
 	var existingTitle string
-	if sessionID != "" {
+	err = tx.QueryRowContext(c.Request.Context(), `
+		SELECT title FROM sessions WHERE id = $1
+	`, sessionID).Scan(&existingTitle)
+	if err == sql.ErrNoRows {
 		err = tx.QueryRowContext(c.Request.Context(), `
-			SELECT title FROM sessions WHERE id = $1
-		`, sessionID).Scan(&existingTitle)
-		if err == sql.ErrNoRows {
-			writeError(c, http.StatusNotFound, "session not found")
-			return
-		}
+			INSERT INTO sessions (id, agent, title, models, device, project, app)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			RETURNING id, title
+		`, sessionID, agentName, sessionTitle, model, device, project, appName).Scan(&sessionID, &sessionTitle)
 		if err != nil {
-			writeError(c, http.StatusInternalServerError, "could not load session")
+			writeError(c, http.StatusInternalServerError, "could not create session")
 			return
 		}
+	} else if err != nil {
+		writeError(c, http.StatusInternalServerError, "could not load session")
+		return
+	} else {
 		sessionTitle = existingTitle
 		_, err = tx.ExecContext(c.Request.Context(), `
 			UPDATE sessions
@@ -265,43 +272,33 @@ func (h *Handler) LogAgentResponse(c *gin.Context) {
 			writeError(c, http.StatusInternalServerError, "could not update session")
 			return
 		}
-	} else {
-		err = tx.QueryRowContext(c.Request.Context(), `
-			INSERT INTO sessions (agent, title, models, device, project, app)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			RETURNING id, title
-		`, agentName, sessionTitle, model, device, project, appName).Scan(&sessionID, &sessionTitle)
-		if err != nil {
-			writeError(c, http.StatusInternalServerError, "could not create session")
-			return
-		}
 	}
 
 	var turn models.SessionPrompt
 	err = tx.QueryRowContext(c.Request.Context(), `
 		INSERT INTO session_prompts (
 			session_id, prompt, mode, response, rate, duration_ms,
-			model, project, app, user_ip, token_usage, refined_prompt, is_accepted,
+			model, project, app, user_ip, input_token, output_token, refined_prompt, is_accepted,
 			log_date, log_time
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10, $11, $12, $13,
-			$14, $15
+			$7, $8, $9, $10, $11, $12, $13, $14,
+			$15, $16
 		)
 		RETURNING
 			id, session_id, prompt, mode, response, rate, duration_ms,
 			COALESCE(model, ''), COALESCE(project, ''), COALESCE(app, 'cursor'), COALESCE(user_ip, ''),
-			COALESCE(token_usage, ''), COALESCE(refined_prompt, ''), COALESCE(is_accepted, TRUE),
+			COALESCE(input_token, 0), COALESCE(output_token, 0), COALESCE(refined_prompt, ''), COALESCE(is_accepted, TRUE),
 			COALESCE(to_char(log_date, 'YYYY-MM-DD'), ''),
 			COALESCE(to_char(log_time, 'HH24:MI:SS'), ''),
 			created_at
 	`, sessionID, userPrompt, mode, agentResponse, *req.Rate, *req.DurationMs,
-		model, project, appName, userIP, tokenUsage, refined, *req.IsAccepted,
+		model, project, appName, userIP, *req.InputToken, *req.OutputToken, refined, *req.IsAccepted,
 		logDate, logTime,
 	).Scan(
 		&turn.ID, &turn.SessionID, &turn.Prompt, &turn.Mode, &turn.Response,
 		&turn.Rate, &turn.DurationMs, &turn.Model, &turn.Project, &turn.App, &turn.UserIP,
-		&turn.TokenUsage, &turn.RefinedPrompt, &turn.IsAccepted, &turn.LogDate, &turn.LogTime,
+		&turn.InputToken, &turn.OutputToken, &turn.RefinedPrompt, &turn.IsAccepted, &turn.LogDate, &turn.LogTime,
 		&turn.CreatedAt,
 	)
 	if err != nil {
@@ -332,16 +329,4 @@ func (h *Handler) LogAgentResponse(c *gin.Context) {
 		SessionTitle: sessionTitle,
 		Turn:         turn,
 	})
-}
-
-func clientIP(c *gin.Context) string {
-	ip := strings.TrimSpace(c.ClientIP())
-	if ip != "" {
-		return ip
-	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(c.Request.RemoteAddr))
-	if err == nil && host != "" {
-		return host
-	}
-	return strings.TrimSpace(c.Request.RemoteAddr)
 }

@@ -46,7 +46,7 @@ Restart MCP / reload Cursor after changing `mcp.json`.
 
 ### `log_agent_response`
 
-Full turn fields sent to the API: `model`, `rate`, `date`, `time`, `device`, `user_ip`, `duration_ms`, `project`, `app` (default `cursor`), `token_usage`, `user_prompt`, `refined_prompt`, `is_accepted`, `agent_response`, `session`, `title_of_session`.
+Full turn fields sent to the API (all required): `model`, `rate`, `date`, `time`, `device`, `user_ip`, `duration_ms`, `project`, `app`, `input_token`, `output_token`, `user_prompt`, `refined_prompt` (empty string allowed), `is_accepted`, `agent_response`, `session` (UUID; creates session when unknown), `title_of_session`, `mode`, `agent`.
 
 Authenticated tools auto-login with env credentials when no JWT is cached.
 

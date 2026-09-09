@@ -40,7 +40,8 @@ export type SessionPromptRow = {
   project?: string
   app?: string
   user_ip?: string
-  token_usage?: string
+  input_token?: number
+  output_token?: number
   refined_prompt?: string
   is_accepted?: boolean
   date?: string

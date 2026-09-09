@@ -105,7 +105,11 @@ onMounted(async () => {
                 {{ formatDuration(turn.duration_ms) }}
               </td>
               <td class="border-b border-border px-3 py-3 tabular-nums">
-                {{ turn.token_usage || '—' }}
+                {{
+                  turn.input_token != null || turn.output_token != null
+                    ? `in:${turn.input_token ?? 0} out:${turn.output_token ?? 0}`
+                    : '—'
+                }}
               </td>
               <td class="border-b border-border px-3 py-3 whitespace-nowrap font-mono text-xs">
                 {{ turn.user_ip || '—' }}

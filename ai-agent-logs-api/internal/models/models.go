@@ -57,7 +57,8 @@ type SessionPrompt struct {
 	Project       string    `json:"project"`
 	App           string    `json:"app"`
 	UserIP        string    `json:"user_ip"`
-	TokenUsage    string    `json:"token_usage"`
+	InputToken    int       `json:"input_token"`
+	OutputToken   int       `json:"output_token"`
 	RefinedPrompt string    `json:"refined_prompt"`
 	IsAccepted    bool      `json:"is_accepted"`
 	LogDate       string    `json:"date"`

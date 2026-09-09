@@ -101,41 +101,27 @@ export function registerTools(server: McpServer, client: AiAgentLogsClient): voi
 
   server.tool(
     'log_agent_response',
-    'Log one full agent turn to ai-agent-logs-api (POST /api/v1/agent-responses). Creates or reuses a session, stores the turn, and mirrors a prompts row. Auto-logs in if needed.',
+    'Log one full agent turn to ai-agent-logs-api (POST /api/v1/agent-responses). Creates or reuses a session (by required session id), stores the turn, and mirrors a prompts row. Auto-logs in if needed.',
     {
       model: z.string().describe('Model name (e.g. Composer, Auto)'),
       rate: z.number().int().min(0).max(10).describe('Integer prompt rate 0–10'),
       date: z.string().describe('Local date YYYY-MM-DD'),
       time: z.string().describe('Local time HH:MM:SS'),
       device: z.string().describe('Device / hostname'),
-      user_ip: z
-        .string()
-        .optional()
-        .describe('User IP if known; API fills from request when omitted'),
+      user_ip: z.string().describe('User IP'),
       duration_ms: z.number().int().min(0).describe('Turn duration in milliseconds'),
       project: z.string().describe('Project / workspace name'),
-      app: z
-        .string()
-        .optional()
-        .describe('Client app name (default: cursor)'),
-      token_usage: z
-        .string()
-        .optional()
-        .describe('Token usage summary (e.g. "in:1200 out:800" or unknown)'),
+      app: z.string().describe('Client app name (e.g. cursor)'),
+      input_token: z.number().int().min(0).describe('Input / context token count'),
+      output_token: z.number().int().min(0).describe('Output token count'),
       user_prompt: z.string().describe('Raw human prompt'),
-      refined_prompt: z
-        .string()
-        .optional()
-        .describe('Transformed / refined prompt; empty if none'),
+      refined_prompt: z.string().describe('Transformed / refined prompt; empty string if none'),
       is_accepted: z.boolean().describe('Whether Human prompt is accepted'),
       agent_response: z.string().describe('Final agent user-facing response text'),
-      session: z
-        .string()
-        .optional()
-        .describe('Existing session id to append; omit to create a new session'),
+      session: z.string().describe('Session id (UUID); creates the session when unknown'),
       title_of_session: z.string().describe('Session title (chat title)'),
-      mode: z.string().optional().describe('Agent mode (default: agent)'),
-      agent: z.string().optional().describe('Agent product name (default: Cursor)'),
+      mode: z.string().describe('Agent mode (e.g. agent, ask, plan)'),
+      agent: z.string().describe('Agent product name (e.g. Cursor)'),
     },
     async (args) => {
       try {
@@ -145,19 +131,20 @@ export function registerTools(server: McpServer, client: AiAgentLogsClient): voi
           date: args.date,
           time: args.time,
           device: args.device,
+          user_ip: args.user_ip,
           duration_ms: args.duration_ms,
           project: args.project,
-          app: args.app && args.app.trim() !== '' ? args.app : 'cursor',
+          app: args.app,
+          input_token: args.input_token,
+          output_token: args.output_token,
           user_prompt: args.user_prompt,
+          refined_prompt: args.refined_prompt,
           is_accepted: args.is_accepted,
           agent_response: args.agent_response,
+          session: args.session,
           title_of_session: args.title_of_session,
-          ...(args.user_ip ? { user_ip: args.user_ip } : {}),
-          ...(args.token_usage !== undefined ? { token_usage: args.token_usage } : {}),
-          ...(args.refined_prompt !== undefined ? { refined_prompt: args.refined_prompt } : {}),
-          ...(args.session ? { session: args.session } : {}),
-          ...(args.mode ? { mode: args.mode } : {}),
-          ...(args.agent ? { agent: args.agent } : {}),
+          mode: args.mode,
+          agent: args.agent,
         }
         return textResult(await client.logAgentResponse(body))
       } catch (err) {
