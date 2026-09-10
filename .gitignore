@@ -1,4 +1,4 @@
-﻿*.exe
+*.exe
 *.EXE
 
 # auto-managed: files > 5MB
@@ -6,3 +6,4 @@ ai-agent-logs-mcp/node_modules/typescript/lib/typescript.js
 ai-agent-logs-mcp/node_modules/typescript/lib/_tsc.js
 ai-agent-logs-webui/node_modules/typescript/lib/typescript.js
 ai-agent-logs-webui/node_modules/typescript/lib/_tsc.js
+# === auto: large files (>5MB) ===
